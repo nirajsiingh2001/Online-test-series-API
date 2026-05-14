@@ -6,6 +6,8 @@ from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
+from django.core.mail import send_mail
+from django.conf import settings
 
 from .models import UserProfile,TestSeries,Test,Question,Result,UserAnswer
 from .serializers import UserProfileSerializer,TestSeriesSerializer,TestSerializer,QuestionSerializer
@@ -49,12 +51,24 @@ class UserRegisterAPIView(APIView):
         full_name=request.data.get("full_name")
         phone=request.data.get("phone")
         role=request.data.get("role")
+        print("username",username)
         if User.objects.filter(username=username).exists():
             return Response({"error":"Username already exists"},status=status.HTTP_400_BAD_REQUEST)
         user=User.objects.create_user(username=username,password=password,email=email)
         UserProfile.objects.create(user=user,full_name=full_name,phone=phone,role=role)
-        return Response({"message":"User created successfully"},status=status.HTTP_201_CREATED)
+        
+        send_mail(
+            subject="Welcome to online test series platform",
+            message=f'hello {user.username},thanks for registering on our platform.',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        return Response({"message":"User created successfully"},
+                    status=status.HTTP_201_CREATED) 
     
+    
+
 class LoginAPIView(APIView):
     permission_classes=[AllowAny]
     def post(self,request):
@@ -67,6 +81,14 @@ class LoginAPIView(APIView):
         
         token,created=Token.objects.get_or_create(user=user)
         print(token.key)
+        send_mail(
+            subject="login alert",
+            message=f"hello{user.username},you have successfully logged in.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+
+        )
         return Response({"message":"Login successful","token":token.key},status=status.HTTP_200_OK)
 
 class TestSeriesAPIView(APIView):
