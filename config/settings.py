@@ -139,6 +139,6 @@ EMAIL_PORT=587
 EMAIL_USE_TLS=True
 
 EMAIL_HOST_USER='niraj.siingh2001@gmail.com'
-EMAIL_HOST_PASSWORD='your_app_password_here'
+EMAIL_HOST_PASSWORD='raft pbdw ykpz atdn'
 
 DEFAULT_FROM_EMAIL=EMAIL_HOST_USER

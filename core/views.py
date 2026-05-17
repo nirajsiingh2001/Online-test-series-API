@@ -8,6 +8,8 @@ from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from django.core.mail import send_mail
 from django.conf import settings
+from django.shortcuts import get_object_or_404
+
 
 from .models import UserProfile,TestSeries,Test,Question,Result,UserAnswer
 from .serializers import UserProfileSerializer,TestSeriesSerializer,TestSerializer,QuestionSerializer
@@ -55,17 +57,51 @@ class UserRegisterAPIView(APIView):
         if User.objects.filter(username=username).exists():
             return Response({"error":"Username already exists"},status=status.HTTP_400_BAD_REQUEST)
         user=User.objects.create_user(username=username,password=password,email=email)
-        UserProfile.objects.create(user=user,full_name=full_name,phone=phone,role=role)
-        
-        send_mail(
-            subject="Welcome to online test series platform",
-            message=f'hello {user.username},thanks for registering on our platform.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
+        #
+        profile =UserProfile.objects.create(
+            user=user,
+            full_name=full_name,
+            phone=phone,
+            role=role
         )
-        return Response({"message":"User created successfully"},
-                    status=status.HTTP_201_CREATED) 
+        verification_link=request.build_absolute_uri(
+            f"/api/verify-email/{profile.email_verification_token}/"
+        )
+        print("Verification link generated:", verification_link)
+        print("Sending verification email to:", user.email)
+        print("Email content:", f"Hello {user.username},\n\nPlease verify your email by clicking the following link:\n{verification_link}\n\nThank you!")
+        send_mail(
+            subject="Email verification",
+            message=(f"Hello {user.username},\n\n"
+                    f"Thank you for registering on our platform.\n"
+                    f"Please click the link below to verify your email address:\n"
+                    f"{verification_link}\n\n"
+                    f"Thank you,"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+        )
+        print("Verification email sent to:", user.email)
+        print("Verification link:", verification_link)
+        print("User created:", user)
+        print("User profile created:", profile)
+        return Response({"message":"User registered successfully. Please check your email to verify your account."},status=status.HTTP_201_CREATED)
+
+class VerifyEmailAPIView(APIView):
+    permission_classes=[AllowAny]
+    def get(self,request,token):
+        print("Email verification API called")
+        print("Token received:", token)
+        profile=get_object_or_404(UserProfile,email_verification_token=token)
+        print("Profile found for token:", profile)
+        profile.is_email_verified=True
+        profile.email_verification_token=None
+        profile.save()
+        print("Email verified for user:", profile.user.username)
+        return Response({"message":"Email verified successfully. You can now log in."},status=status.HTTP_200_OK)
+
+        
     
     
 
@@ -78,6 +114,9 @@ class LoginAPIView(APIView):
 
         if user is None:
             return Response({"error":"Invalid credentials"},status=status.HTTP_400_BAD_REQUEST)
+        profile=user.userprofile
+        if not profile.is_email_verified:
+            return Response({"error":"Email not verified. Please check your email."},status=status.HTTP_400_BAD_REQUEST)
         
         token,created=Token.objects.get_or_create(user=user)
         print(token.key)
@@ -275,3 +314,18 @@ class ResultAPIView(APIView):
             "answers":data
         })
 
+class VerifyEmailAPIView(APIView):
+    permission_classes=[AllowAny]
+    def get(self,request,token):
+        print("Email verification API called")
+        print("Token received:", token)
+        try:
+            profile=UserProfile.objects.get(email_verification_token=token)
+            print("Profile found for token:", profile)
+        except UserProfile.DoesNotExist:
+            return Response({"error":"Invalid token"},status=status.HTTP_400_BAD_REQUEST)
+        profile.is_email_verified=True
+        profile.email_verification_token=None
+        profile.save()
+        print("Email verified for user:", profile.user.username)
+        return Response({"message":"Email verified successfully. You can now log in."},status=status.HTTP_200_OK)
