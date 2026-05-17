@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid
 
 class UserProfile(models.Model):
     ROLE_CHOICES = (
@@ -12,6 +13,9 @@ class UserProfile(models.Model):
     role=models.CharField(max_length=20,choices=ROLE_CHOICES,default='student')
     profile_image=models.ImageField(upload_to='profiles/',null=True, blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
+    is_email_verified=models.BooleanField(default=False)
+    email_verification_token=models.UUIDField(default=uuid.uuid4,
+                                              unique=True,null=True,blank=True)
 
     def __str__(self):
         return self.full_name
